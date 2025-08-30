@@ -12,6 +12,7 @@ export const REST_URL_GET_LAST_SENSELOG_WATER_BENDER = '/senselog/Get_Last_Sense
 export const REST_URL_GET_AVG_SENSELOG_WATER_BENDER = '/senselog/Get_Avg_Senselog?startDate={startDate}&endDate={endDate}';
 export const REST_URL_GET_MONTHLY_SENSELOG_WATER_BENDER = '/senselog/Get_MonthlyTrans_WaterBender?year={year}';
 export const REST_URL_GET_DAILY_SENSELOG_WATER_BENDER = '/senselog/Get_TodayTrans_WaterBender';
+export const REST_URL_GET_FORECAST_WATER_BENDER = '/senselog/Get_TodayTrans_Forecast';
 
 export const REST_METHOD_GET = 'Get';
 export const REST_METHOD_POST = 'Post';

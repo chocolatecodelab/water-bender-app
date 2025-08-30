@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import { downloadingWaterBenderAll, downloadingWaterBenderAvg, downloadingWaterBenderLast, downloadingWaterBenderMonthly } from './homeService'
+import { downloadingWaterBenderAll, downloadingWaterBenderAvg, downloadingWaterBenderLast, downloadingWaterBenderMonthly, downloadingWaterBenderDaily, downloadingWaterBenderForecast } from './homeService'
 
 export const downloadingWaterBenderLastAsync = createAsyncThunk(
     'downloadingWaterBenderLastAsync', async (_, thunkAPI) => {
@@ -46,6 +46,36 @@ export const downloadingWaterBenderMonthlyAsync = createAsyncThunk(
         }
     })
 
+export const downloadingWaterBenderDailyAsync = createAsyncThunk(
+    'downloadingWaterBenderDailyAsync', async (_, thunkAPI) => {
+        try {
+            return await downloadingWaterBenderDaily()
+        } catch (error) {
+            const message =
+                (JSON.stringify(error.response) &&
+                    error.response.data &&
+                    error.response.data.message) ||
+                error.message ||
+                error.toString()
+            return thunkAPI.rejectWithValue(message)
+        }
+    })
+
+export const downloadingWaterBenderForecastAsync = createAsyncThunk(
+    'downloadingWaterBenderForecastAsync', async (hours = 12, thunkAPI) => {
+        try {
+            return await downloadingWaterBenderForecast(hours)
+        } catch (error) {
+            const message =
+                (JSON.stringify(error.response) &&
+                    error.response.data &&
+                    error.response.data.message) ||
+                error.message ||
+                error.toString()
+            return thunkAPI.rejectWithValue(message)
+        }
+    })
+
 export const homeSlice = createSlice({
     name: 'home',
     initialState: {
@@ -57,6 +87,7 @@ export const homeSlice = createSlice({
         waterBenderAvg: [],
         waterBenderMonthly: [],
         waterBenderDaily: [],
+        waterBenderForecast: [],
         message: '',
     },
     reducers: {
@@ -69,6 +100,7 @@ export const homeSlice = createSlice({
             state.waterBenderAvg = [],
             state.waterBenderMonthly = [],
             state.waterBenderDaily = [],
+            state.waterBenderForecast = [],
             state.message = '';
         },
     },
@@ -109,6 +141,32 @@ export const homeSlice = createSlice({
                 state.waterBenderMonthly = action.payload;
             })
             .addCase(downloadingWaterBenderMonthlyAsync.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+            })
+            .addCase(downloadingWaterBenderDailyAsync.pending, (state) => {
+                state.isLoading = true;
+            })
+            .addCase(downloadingWaterBenderDailyAsync.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.isSuccess = true;
+                state.waterBenderDaily = action.payload;
+            })
+            .addCase(downloadingWaterBenderDailyAsync.rejected, (state, action) => {
+                state.isLoading = false;
+                state.isError = true;
+                state.message = action.payload;
+            })
+            .addCase(downloadingWaterBenderForecastAsync.pending, (state) => {
+                state.isLoading = true;
+            })
+            .addCase(downloadingWaterBenderForecastAsync.fulfilled, (state, action) => {
+                state.isLoading = false;
+                state.isSuccess = true;
+                state.waterBenderForecast = action.payload;
+            })
+            .addCase(downloadingWaterBenderForecastAsync.rejected, (state, action) => {
                 state.isLoading = false;
                 state.isError = true;
                 state.message = action.payload;

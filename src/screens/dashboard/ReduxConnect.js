@@ -1,6 +1,6 @@
 import { connect } from 'react-redux';
 import DashboardScreen from './Dashboard';
-import { downloadingWaterBenderAvgAsync, downloadingWaterBenderLastAsync, downloadingWaterBenderMonthlyAsync } from '../../redux/features/home/homeSlice';
+import { downloadingWaterBenderAvgAsync, downloadingWaterBenderLastAsync, downloadingWaterBenderMonthlyAsync, downloadingWaterBenderDailyAsync, downloadingWaterBenderForecastAsync } from '../../redux/features/home/homeSlice';
 import moment from 'moment';
 import { logout } from '../../redux/features/login/loginSlice';
 import navigationService from '../../tools/navigationService';
@@ -15,6 +15,8 @@ const mapStateToProps = state => {
         waterBenderLast: state.home?.waterBenderLast[0]?.Surface,
         waterBenderAvg : state.home?.waterBenderAvg?.Data?.[0]?.Rata_Rata_Surface ?? 0, // 0 atau nilai default lainnya
         waterBenderAvgDistance: state.home?.waterBenderAvg?.Data?.[0]?.Data ?? 0,
+        waterBenderDaily: state.home?.waterBenderDaily,
+        waterBenderForecast: state.home?.waterBenderForecast,
         waterBenderMonthly: state.home?.waterBenderMonthly,
         waterBenderPeriod: state.home?.waterBenderAvg.Data,
     })
@@ -30,6 +32,8 @@ const mapDispatchToProps = (dispatch) => ({
         dispatch(downloadingWaterBenderAvgAsync(params))
         dispatch(downloadingWaterBenderLastAsync())
         dispatch(downloadingWaterBenderMonthlyAsync(year))
+        dispatch(downloadingWaterBenderDailyAsync())
+        dispatch(downloadingWaterBenderForecastAsync(12)) // Load 12 hours forecast
         // dispatch(downloadingWaterByMonth())
     },
     onCloseModalError: () => {

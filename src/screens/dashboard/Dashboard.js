@@ -7,8 +7,16 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { getScreenDimension, iPad, ios, iconTools } from '../../tools/helper';
 import { LineChart } from "react-native-gifted-charts";
 import { Text } from 'react-native';
-import { generateChartData } from './dataChart';
+import { generateChartData, generateDailyChartWithForecast } from './dataChart';
 import { ActivityIndicator } from 'react-native-paper';
+import { 
+  calculateDynamicSpacing, 
+  calculateChartWidth, 
+  calculateMaxValue, 
+  chartPresets, 
+  createPointerConfig,
+  getMixedGradientColors 
+} from '../../tools/chartUtils';
 
 const renderEmptyComponent = () => (
   <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: '70%' }}>
@@ -16,22 +24,28 @@ const renderEmptyComponent = () => (
   </View>
 );
 
-const Dashboard = ({ waterBenderAvgDistance, waterBenderLast, waterBenderAvg, waterBenderMonthly, waterBenderPeriod, onAppear, isLoading, onLogoutPressed }) => {
+const Dashboard = ({ waterBenderAvgDistance, waterBenderLast, waterBenderAvg, waterBenderMonthly, waterBenderPeriod, waterBenderDaily, waterBenderForecast, onAppear, isLoading, onLogoutPressed }) => {
   const [startDate, setStartDate] = useState(new Date())
   const [finishDate, setFinishDate] = useState(new Date())
   const [modalStartDate, setModalStartDate] = useState(false)
-  // const [modalFinishDate, setModalFinishDate] = useState(false)
   const [showModalInfo, setShowModalInfo] = useState(false);
   const [messageInfo, setMessageInfo] = useState('');
   const [modalConfirm, setModalConfirm] = useState('');
 
-  let generateChartWaterBenderAvgDistance, generateChartWaterBenderPeriod, generateChartWaterBenderMonthly;
+  let generateChartWaterBenderAvgDistance, generateChartWaterBenderPeriod, generateChartWaterBenderMonthly, generateChartWaterBenderDailyWithForecast;
 
   if(waterBenderAvgDistance && waterBenderLast && waterBenderAvg && waterBenderMonthly && waterBenderPeriod) {
     generateChartWaterBenderAvgDistance = generateChartData(waterBenderAvgDistance, 1);
-    generateChartWaterOverview = generateChartData(waterBenderPeriod, 2);
-    generateChartWaterBenderPeriod = generateChartData(waterBenderPeriod, 4);
+    generateChartWaterBenderPeriod = generateChartData(waterBenderPeriod, 2);
     generateChartWaterBenderMonthly = generateChartData(waterBenderMonthly, 3);
+  }
+
+  // Generate chart data dengan forecast untuk daily
+  if(waterBenderDaily && waterBenderForecast) {
+    generateChartWaterBenderDailyWithForecast = generateDailyChartWithForecast(waterBenderDaily, waterBenderForecast);
+  } else if(waterBenderDaily) {
+    // Jika tidak ada forecast data, gunakan data daily saja
+    generateChartWaterBenderDailyWithForecast = generateChartData(waterBenderDaily, 1);
   }
 
   useEffect(() => {
@@ -71,20 +85,6 @@ const Dashboard = ({ waterBenderAvgDistance, waterBenderLast, waterBenderAvg, wa
             </TouchableOpacity>
 
           </View>
-          {/* <View style={{ width: "45%" }}>
-            <Text style={{ color: COLOR_GRAY_2, fontSize: 16, marginBottom: -10, marginLeft: 10, zIndex: 1, backgroundColor: COLOR_WHITE, width: "55%" }}>Finish date</Text>
-            <View style={{ flexDirection: "row", borderWidth: 1, alignItems: "center", borderRadius: 8, borderColor: COLOR_GRAY_1, paddingTop: 5 }}>
-              <MaterialCommunityIcons name={"calendar-outline"} size={20} color={COLOR_PRIMARY} style={{ marginHorizontal: 10, }} />
-              <TouchableOpacity style={{
-                backgroundColor: COLOR_WHITE,
-                borderColor: COLOR_TRANSPARENT_DARK,
-                marginVertical: 10,
-              }}
-                onPress={() => setModalFinishDate(!modalFinishDate)}>
-                <Text style={{ fontWeight: "bold", textAlign: "center" }}>{moment(finishDate).format('DD MMMM YYYY')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View> */}
         </View>
         <ScrollView>
           <View style={{ width: '100%', justifyContent: 'center', marginBottom: 200 }}>
@@ -114,109 +114,489 @@ const Dashboard = ({ waterBenderAvgDistance, waterBenderLast, waterBenderAvg, wa
             </View>
             {!isLoading ?
               <View>
-                {/* <View style={[styles.card, { marginTop: 20 }]}>
-                  <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ bottom: 24, padding: 7, textAlign: "center", borderRadius: 3, fontWeight: "bold", fontSize: 15, backgroundColor: COLOR_MAIN_SECONDARY, color: COLOR_WHITE }}>Overview</Text>
-                  </View>
-                  <LineChart
-                    areaChart
-                    curved
-                    noOfSections={5}
-                    spacing={80}
-                    data={generateChartWaterOverview}
-                    yAxisLabelWidth={50}
-                    maxValue={5}
-                    xAxisThickness={1}
-                    yAxisThickness={1}
-                    yAxisTextStyle={{ color: 'gray', fontSize: 12 }}
-                    xAxisLabelTextStyle={{ color: 'gray', textAlign: 'center', fontSize: 12 }}
-                    width={getScreenDimension().width / 1.5} // Full width
-                    height={getScreenDimension().height / 1.9} // Adjust height as needed
-                    startFillColor="rgb(221, 87, 70)"
-                    startOpacity={0.8}
-                    endFillColor="rgb(255, 122, 104)"
-                    endOpacity={0.5}
-                    isAnimated
-                    animationDuration={1200}
-                  />
-                </View> */}
                 <View style={[styles.card, { marginTop: 20 }]}>
                   <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ bottom: 24, padding: 7, textAlign: "center", borderRadius: 3, fontWeight: "bold", fontSize: 15, backgroundColor: COLOR_MAIN_SECONDARY, color: COLOR_WHITE }}>Water Surface By Period</Text>
+                    <Text style={{ 
+                      bottom: 24, 
+                      padding: 7, 
+                      textAlign: "center", 
+                      borderRadius: 3, 
+                      fontWeight: "bold", 
+                      fontSize: 15, 
+                      backgroundColor: COLOR_MAIN_SECONDARY, 
+                      color: COLOR_WHITE 
+                    }}>
+                      Water Surface By Period
+                    </Text>
                   </View>
-                  <LineChart
-                    areaChart
-                    curved
-                    noOfSections={5}
-                    spacing={140}
-                    data={generateChartWaterBenderPeriod}
-                    yAxisLabelWidth={50}
-                    maxValue={5}
-                    xAxisThickness={1}
-                    yAxisThickness={1}
-                    yAxisTextStyle={{ color: 'gray', fontSize: 12 }}
-                    xAxisLabelTextStyle={{ color: 'gray', textAlign: 'center', fontSize: 12 }}
-                    width={getScreenDimension().width / 1.5} // Full width
-                    height={getScreenDimension().height / 1.9} // Adjust height as needed
-                    startFillColor="rgb(221, 87, 70)"
-                    startOpacity={0.8}
-                    endFillColor="rgb(255, 122, 104)"
-                    endOpacity={0.5}
-                    isAnimated
-                    animationDuration={1200}
-                  />
+                  
+                  {/* Chart Info */}
+                  <View style={{
+                    marginTop: 10,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: 15,
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontSize: 12,
+                        color: COLOR_GRAY_2,
+                        fontWeight: '500'
+                      }}>
+                        📊 Period Data Points: {(generateChartWaterBenderPeriod || []).length}
+                      </Text>
+                      <Text style={{
+                        fontSize: 11,
+                        color: COLOR_GRAY_2,
+                        marginTop: 2
+                      }}>
+                        Date Range: {moment(startDate).format('DD MMM')} - {moment(finishDate).format('DD MMM')}
+                      </Text>
+                    </View>
+                    
+                    <View style={{
+                      backgroundColor: 'rgba(221, 87, 70, 0.1)',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 15,
+                      borderWidth: 1,
+                      borderColor: 'rgba(221, 87, 70, 0.2)'
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        color: COLOR_MAIN_SECONDARY,
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                      }}>
+                        PERIOD
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Responsive Chart Container with Horizontal Scroll */}
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={true}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: 10,
+                      marginHorizontal: 5,
+                      shadowColor: "#000",
+                      shadowOffset: {
+                        width: 0,
+                        height: 2,
+                      },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3.84,
+                      elevation: 5,
+                    }}
+                    contentContainerStyle={{
+                      padding: 15,
+                      minWidth: getScreenDimension().width - 10
+                    }}
+                  >
+                    <LineChart
+                      areaChart
+                      curved
+                      noOfSections={6}
+                      spacing={Math.max(80, Math.min(100, getScreenDimension().width / Math.max(generateChartWaterBenderPeriod?.length || 1, 1)))}
+                      data={generateChartWaterBenderPeriod}
+                      yAxisLabelWidth={60}
+                      maxValue={calculateMaxValue(generateChartWaterBenderPeriod || [])}
+                      xAxisThickness={1}
+                      yAxisThickness={1}
+                      yAxisTextStyle={{ color: COLOR_GRAY_2, fontSize: 12, fontWeight: '500' }}
+                      xAxisLabelTextStyle={{ 
+                        color: COLOR_GRAY_2, 
+                        textAlign: 'center', 
+                        fontSize: 8, 
+                        fontWeight: '400',
+                        width: 60,
+                        flexWrap: 'wrap'
+                      }}
+                      width={Math.max(
+                        getScreenDimension().width - 80,
+                        (generateChartWaterBenderPeriod || []).length * 100 + 100
+                      )}
+                      height={getScreenDimension().height / 1.8} // Tinggi lebih besar untuk accommodate multiline labels
+                      startFillColor="rgb(221, 87, 70)"
+                      startOpacity={0.8}
+                      endFillColor="rgb(255, 122, 104)"
+                      endOpacity={0.1}
+                      color="rgb(221, 87, 70)"
+                      stripColor="rgba(221, 87, 70, 0.3)"
+                      stripOpacity={0.3}
+                      stripWidth={2}
+                      isAnimated
+                      animationDuration={1200}
+                      pointerConfig={createPointerConfig(chartPresets.colors, 'period')}
+                      initialSpacing={10}
+                      endSpacing={20}
+                    />
+                  </ScrollView>
+                  
+                  {/* Additional Info */}
+                  <View style={{
+                    marginTop: 15,
+                    paddingHorizontal: 15,
+                    paddingVertical: 10,
+                    backgroundColor: 'rgba(221, 87, 70, 0.05)',
+                    borderRadius: 8,
+                    borderLeftWidth: 4,
+                    borderLeftColor: COLOR_MAIN_SECONDARY
+                  }}>
+                    <Text style={{
+                      fontSize: 12,
+                      color: COLOR_GRAY_2,
+                      fontStyle: 'italic',
+                      textAlign: 'center'
+                    }}>
+                      📊 Swipe/Tap on chart for detailed values • Period-based water surface data
+                    </Text>
+                  </View>
                 </View>
                 <View style={[styles.card, { marginTop: 20 }]}>
                   <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ bottom: 24, padding: 7, textAlign: "center", borderRadius: 3, fontWeight: "bold", fontSize: 15, backgroundColor: COLOR_MAIN_SECONDARY, color: COLOR_WHITE }}>Water Surface By Monthly</Text>
+                    <Text style={{ 
+                      bottom: 24, 
+                      padding: 7, 
+                      textAlign: "center", 
+                      borderRadius: 3, 
+                      fontWeight: "bold", 
+                      fontSize: 15, 
+                      backgroundColor: COLOR_MAIN_SECONDARY, 
+                      color: COLOR_WHITE 
+                    }}>
+                      Water Surface By Monthly
+                    </Text>
                   </View>
-                  <LineChart
-                    areaChart
-                    curved
-                    noOfSections={5}
-                    spacing={90}
-                    data={generateChartWaterBenderMonthly}
-                    yAxisLabelWidth={50}
-                    maxValue={5}
-                    xAxisThickness={1}
-                    yAxisThickness={1}
-                    yAxisTextStyle={{ color: 'gray', fontSize: 12 }}
-                    xAxisLabelTextStyle={{ color: 'gray', textAlign: 'center', fontSize: 12 }}
-                    width={getScreenDimension().width / 1.5} // Full width
-                    height={getScreenDimension().height / 1.9} // Adjust height as needed
-                    startFillColor="rgb(221, 87, 70)"
-                    startOpacity={0.8}
-                    endFillColor="rgb(255, 122, 104)"
-                    endOpacity={0.5}
-                    isAnimated
-                    animationDuration={1200}
-                  />
+                  
+                  {/* Chart Info */}
+                  <View style={{
+                    marginTop: 10,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: 15,
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontSize: 12,
+                        color: COLOR_GRAY_2,
+                        fontWeight: '500'
+                      }}>
+                        📊 Monthly Data Points: {(generateChartWaterBenderMonthly || []).length}
+                      </Text>
+                      <Text style={{
+                        fontSize: 11,
+                        color: COLOR_GRAY_2,
+                        marginTop: 2
+                      }}>
+                        Year Overview: {moment().format('YYYY')}
+                      </Text>
+                    </View>
+                    
+                    <View style={{
+                      backgroundColor: 'rgba(221, 87, 70, 0.1)',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 15,
+                      borderWidth: 1,
+                      borderColor: 'rgba(221, 87, 70, 0.2)'
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        color: COLOR_MAIN_SECONDARY,
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                      }}>
+                        MONTHLY
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Responsive Chart Container with Horizontal Scroll */}
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={true}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: 10,
+                      marginHorizontal: 5,
+                      shadowColor: "#000",
+                      shadowOffset: {
+                        width: 0,
+                        height: 2,
+                      },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3.84,
+                      elevation: 5,
+                    }}
+                    contentContainerStyle={{
+                      padding: 15,
+                      minWidth: getScreenDimension().width - 10
+                    }}
+                  >
+                    <LineChart
+                      areaChart
+                      curved
+                      noOfSections={6}
+                      spacing={Math.max(70, Math.min(90, getScreenDimension().width / Math.max(generateChartWaterBenderMonthly?.length || 1, 1)))}
+                      data={generateChartWaterBenderMonthly}
+                      yAxisLabelWidth={60}
+                      maxValue={calculateMaxValue(generateChartWaterBenderMonthly || [])}
+                      xAxisThickness={1}
+                      yAxisThickness={1}
+                      yAxisTextStyle={{ color: COLOR_GRAY_2, fontSize: 12, fontWeight: '500' }}
+                      xAxisLabelTextStyle={{ color: COLOR_GRAY_2, textAlign: 'center', fontSize: 11, fontWeight: '400' }}
+                      width={Math.max(
+                        getScreenDimension().width - 80,
+                        (generateChartWaterBenderMonthly || []).length * 90 + 100
+                      )}
+                      height={getScreenDimension().height / 2.1}
+                      startFillColor="rgb(221, 87, 70)"
+                      startOpacity={0.8}
+                      endFillColor="rgb(255, 122, 104)"
+                      endOpacity={0.1}
+                      color="rgb(221, 87, 70)"
+                      stripColor="rgba(221, 87, 70, 0.3)"
+                      stripOpacity={0.3}
+                      stripWidth={2}
+                      isAnimated
+                      animationDuration={1200}
+                      pointerConfig={createPointerConfig(chartPresets.colors, 'monthly')}
+                      initialSpacing={10}
+                      endSpacing={20}
+                    />
+                  </ScrollView>
+                  
+                  {/* Additional Info */}
+                  <View style={{
+                    marginTop: 15,
+                    paddingHorizontal: 15,
+                    paddingVertical: 10,
+                    backgroundColor: 'rgba(221, 87, 70, 0.05)',
+                    borderRadius: 8,
+                    borderLeftWidth: 4,
+                    borderLeftColor: COLOR_MAIN_SECONDARY
+                  }}>
+                    <Text style={{
+                      fontSize: 12,
+                      color: COLOR_GRAY_2,
+                      fontStyle: 'italic',
+                      textAlign: 'center'
+                    }}>
+                      📊 Swipe/Tap on chart for detailed values • Monthly water surface trends
+                    </Text>
+                  </View>
                 </View>
                 <View style={[styles.card, { marginTop: 20, }]}>
                   <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ bottom: 24, padding: 7, textAlign: "center", borderRadius: 3, fontWeight: "bold", fontSize: 15, backgroundColor: COLOR_MAIN_SECONDARY, color: COLOR_WHITE }}>Water Surface By Daily</Text>
+                    <Text style={{ 
+                      bottom: 24, 
+                      padding: 7, 
+                      textAlign: "center", 
+                      borderRadius: 3, 
+                      fontWeight: "bold", 
+                      fontSize: 15, 
+                      backgroundColor: COLOR_MAIN_SECONDARY, 
+                      color: COLOR_WHITE 
+                    }}>
+                      Water Surface By Hourly (with Forecast)
+                    </Text>
                   </View>
-                  <LineChart
-                    areaChart
-                    curved
-                    noOfSections={5}
-                    spacing={90}
-                    data={generateChartWaterBenderAvgDistance}
-                    yAxisLabelWidth={50}
-                    maxValue={5}
-                    xAxisThickness={1}
-                    yAxisThickness={1}
-                    yAxisTextStyle={{ color: 'gray', fontSize: 12 }}
-                    xAxisLabelTextStyle={{ color: 'gray', textAlign: 'center', fontSize: 12 }}
-                    width={getScreenDimension().width / 1.5} // Full width
-                    height={getScreenDimension().height / 1.9} // Adjust height as needed
-                    startFillColor="rgb(221, 87, 70)"
-                    startOpacity={0.8}
-                    endFillColor="rgb(255, 122, 104)"
-                    endOpacity={0.5}
-                    isAnimated
-                    animationDuration={1200}
-                  />
+                  
+                  {/* Enhanced Legend */}
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-around', 
+                    marginBottom: 15,
+                    paddingHorizontal: 20,
+                    backgroundColor: 'rgba(0,0,0,0.02)',
+                    paddingVertical: 10,
+                    borderRadius: 8
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ 
+                        width: 16, 
+                        height: 4, 
+                        backgroundColor: COLOR_MAIN_SECONDARY, // Actual data color
+                        marginRight: 8,
+                        borderRadius: 2
+                      }} />
+                      <Text style={{ fontSize: 13, color: COLOR_GRAY_2, fontWeight: '500' }}>Actual Data</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ 
+                        width: 16, 
+                        height: 4, 
+                        backgroundColor: COLOR_PRIMARY, // Forecast data color
+                        marginRight: 8,
+                        borderRadius: 2,
+                        borderStyle: 'dashed',
+                        borderWidth: 1,
+                        borderColor: COLOR_PRIMARY
+                      }} />
+                      <Text style={{ fontSize: 13, color: COLOR_GRAY_2, fontWeight: '500' }}>Forecast Data</Text>
+                    </View>
+                  </View>
+                  
+                  {/* Additional Chart Info & Controls */}
+                  <View style={{
+                    marginTop: 10,
+                    marginBottom: 10,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: 15,
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{
+                        fontSize: 12,
+                        color: COLOR_GRAY_2,
+                        fontWeight: '500'
+                      }}>
+                        📊 Data Points: {(generateChartWaterBenderDailyWithForecast || []).length}
+                      </Text>
+                      <Text style={{
+                        fontSize: 11,
+                        color: COLOR_GRAY_2,
+                        marginTop: 2
+                      }}>
+                        Actual: {(generateChartWaterBenderDailyWithForecast || []).filter(d => !d.isForecast).length} | 
+                        Forecast: {(generateChartWaterBenderDailyWithForecast || []).filter(d => d.isForecast).length}
+                      </Text>
+                    </View>
+                    
+                    <View style={{
+                      backgroundColor: 'rgba(0, 109, 255, 0.1)',
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 15,
+                      borderWidth: 1,
+                      borderColor: 'rgba(0, 109, 255, 0.2)'
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        color: COLOR_MAIN_SECONDARY,
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                      }}>
+                        LIVE DATA
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Responsive Chart Container with Horizontal Scroll */}
+                  <ScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={true}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: 10,
+                      marginHorizontal: 5,
+                      shadowColor: "#000",
+                      shadowOffset: {
+                        width: 0,
+                        height: 2,
+                      },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 3.84,
+                      elevation: 5,
+                    }}
+                    contentContainerStyle={{
+                      padding: 15,
+                      minWidth: getScreenDimension().width - 10
+                    }}
+                  >
+                    <LineChart
+                      // Chart data and responsive configuration
+                      data={generateChartWaterBenderDailyWithForecast || generateChartWaterBenderAvgDistance}
+                      
+                      // Fixed spacing untuk consistency
+                      spacing={65}
+                      width={Math.max(
+                        getScreenDimension().width - 80,
+                        (generateChartWaterBenderDailyWithForecast || []).length * 65 + 100
+                      )}
+                      height={getScreenDimension().height / 2.1}
+                      
+                      // Y-axis configuration (dynamic max value)
+                      yAxisLabelWidth={60}
+                      maxValue={calculateMaxValue(generateChartWaterBenderDailyWithForecast || [])}
+                      noOfSections={6}
+                      yAxisOffset={0}
+                      
+                      // Apply chart presets
+                      {...chartPresets.responsive}
+                      
+                      // Color configuration
+                      color={chartPresets.colors.actual}
+                      stripColor={chartPresets.colors.strip}
+                      stripOpacity={0.3}
+                      stripWidth={2}
+                      
+                      // Labels styling
+                      yAxisTextStyle={{ 
+                        color: COLOR_GRAY_2, 
+                        fontSize: 12,
+                        fontWeight: '500'
+                      }}
+                      xAxisLabelTextStyle={{ 
+                        color: COLOR_GRAY_2, 
+                        textAlign: 'center', 
+                        fontSize: 11,
+                        fontWeight: '400',
+                        rotation: 0
+                      }}
+                      
+                      // Dynamic data point colors
+                      dataPointsColor={(index) => {
+                        if (generateChartWaterBenderDailyWithForecast && generateChartWaterBenderDailyWithForecast[index]) {
+                          return generateChartWaterBenderDailyWithForecast[index].isForecast 
+                            ? chartPresets.colors.forecast 
+                            : chartPresets.colors.actual;
+                        }
+                        return chartPresets.colors.actual;
+                      }}
+                      
+                      // Area fill with dynamic colors based on data composition
+                      areaChart
+                      {...getMixedGradientColors(generateChartWaterBenderDailyWithForecast || [])}
+                      startOpacity={0.8}
+                      endOpacity={0.1}
+                      
+                      // Enhanced pointer configuration
+                      pointerConfig={createPointerConfig(chartPresets.colors, 'daily')}
+                      
+                      // Better spacing
+                      initialSpacing={10}
+                      endSpacing={20}
+                    />
+                  </ScrollView>
+                  
+                  {/* Additional Info */}
+                  <View style={{
+                    marginTop: 15,
+                    paddingHorizontal: 15,
+                    paddingVertical: 10,
+                    backgroundColor: 'rgba(0, 109, 255, 0.05)',
+                    borderRadius: 8,
+                    borderLeftWidth: 4,
+                    borderLeftColor: COLOR_MAIN_SECONDARY
+                  }}>
+                    <Text style={{
+                      fontSize: 12,
+                      color: COLOR_GRAY_2,
+                      fontStyle: 'italic',
+                      textAlign: 'center'
+                    }}>
+                      📊 Swipe/Tap on chart for detailed values • Red: Real-time data • Blue: 12-hour forecast
+                    </Text>
+                  </View>
                 </View>
               </View>
               :
