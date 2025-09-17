@@ -1,46 +1,55 @@
 /**
- * Dashboard Screen Component
+ * Dashboard Screen Component - Modular Architecture
  * 
- * Main dashboard for water monitoring application displaying real-time water level data,
- * historical trends, and forecast predictions through interactive charts.
+ * A highly optimized water monitoring dashboard featuring modular component architecture,
+ * custom hooks for state management, and responsive design patterns.
  * 
- * Features:
- * - Real-time water depth monitoring (latest reading + average)
- * - Interactive date selection for historical data analysis
- * - Multiple chart types: Period, Daily/Hourly, Monthly views
- * - Water level forecasting with visual indicators
- * - Responsive chart sizing and real-time performance
- * - Fresh data processing for accurate monitoring
+ * Architecture Features:
+ * - Modular component structure (extracted from 1729 to 685 lines)
+ * - Custom hooks for state management and data processing
+ * - Reusable chart components with interactive tooltips
+ * - Responsive design with screen size adaptation
+ * - Optimized data caching and loading strategies
+ * - Clean separation of concerns following React best practices
  * 
- * Chart Types:
- * - Period Chart: Water surface trends over selected date range
- * - Daily/Hourly Chart: 24-hour water level with forecast overlay
- * - Monthly Chart: Long-term water level patterns
+ * Components Used:
+ * - PeriodChartSection: Water surface trends over selected date range
+ * - MonthlyChartSection: Long-term water level patterns  
+ * - DailyHourlyChartSection: 24-hour water level with forecast overlay
+ * - WaterDepthCards: Real-time depth monitoring display
+ * - DateSelectionSection: Interactive date selection and filtering
+ * 
+ * Custom Hooks:
+ * - useDateSelection: Date selection and modal management
+ * - useModalManagement: Modal state and interaction handling
+ * - useResponsiveLayout: Screen dimension and orientation tracking
+ * - useRefreshControl: Pull-to-refresh functionality
+ * - useChartData: Chart data processing and optimization
  * 
  * @file src/screens/dashboard/Dashboard.js
- * @version 2.1.0
- * @author Water Monitoring Team
+ * @version 3.0.0 - Modular Architecture
+ * @author Water Monitoring Dashboard Team
  */
 
-import React, { Fragment, useEffect, useState } from 'react'
-import { StyleSheet, View, FlatList, TouchableOpacity, ScrollView, Text, Dimensions, RefreshControl } from 'react-native'
+import React, { Fragment, useEffect } from 'react'
+import { StyleSheet, View, TouchableOpacity, ScrollView, Text, RefreshControl } from 'react-native'
 import { ActivityIndicator } from 'react-native-paper'
-import { LineChart } from "react-native-gifted-charts"
 import moment from 'moment'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
 
 // ===== COMPONENT IMPORTS =====
 import { 
   BaseScreen, 
-  BodyLarge, 
-  Body, 
-  BodySmall, 
   MyHeader, 
   MyModal, 
-  H2, 
   MyModalInfo, 
   DatePicker, 
-  MyModalConfirm 
+  MyModalConfirm,
+  WaterDepthCards,
+  DateSelectionSection,
+  PeriodChartSection,
+  MonthlyChartSection,
+  DailyHourlyChartSection
 } from "../../components"
 
 // ===== UTILITY IMPORTS =====
@@ -61,13 +70,22 @@ import {
   ios, 
   iconTools 
 } from '../../tools/helper'
+
+// ===== CUSTOM HOOKS =====
+import {
+  useDateSelection,
+  useModalManagement,
+  useResponsiveLayout,
+  useRefreshControl,
+  useChartData
+} from '../../hooks'
+
+// ===== UTILITY FUNCTIONS =====
+import { resetDataCache } from '../../tools/cacheUtils';
 import { 
-  calculateDynamicSpacing, 
-  calculateChartWidth, 
-  calculateMaxValue, 
-  chartPresets, 
-  createPointerConfig,
-} from '../../tools/chartUtils'
+  handleQuickFilterSelect as utilHandleQuickFilter,
+  handleManualRefresh as utilHandleManualRefresh
+} from '../../tools/dashboardUtils';
 
 // ===== CHART DATA PROCESSING =====
 import {
@@ -77,230 +95,6 @@ import {
   getSegmentedAreaColors,
   getDataPointLineColors
 } from './dataChart'
-
-// ===== HELPER COMPONENTS =====
-
-/**
- * Render empty state component when no data available
- * @returns {JSX.Element} Empty state component
- */
-const renderEmptyComponent = () => (
-  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: '70%' }}>
-    <BodyLarge>No items to display</BodyLarge>
-  </View>
-);
-
-/**
- * Chart Loading Component with skeleton animation
- * @param {string} chartType - Type of chart (period, monthly, hourly)
- * @param {string} title - Chart title
- * @param {string} subtitle - Chart subtitle
- * @returns {JSX.Element} Loading state component
- */
-const ChartLoadingSkeleton = ({ chartType, title, subtitle }) => (
-  <View style={[styles.card, { marginTop: 20 }]}>
-    {/* Loading Header */}
-    <View style={{ width: "100%", marginTop: 10, marginBottom: 20 }}>
-      <View style={{
-        backgroundColor: 'rgba(221, 87, 70, 0.1)',
-        padding: 12,
-        borderRadius: 8,
-        alignItems: 'center'
-      }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}>
-          <ActivityIndicator size="small" color={COLOR_MAIN_SECONDARY} style={{ marginRight: 8 }} />
-          <Text style={{
-            fontSize: 15,
-            fontWeight: '600',
-            color: COLOR_MAIN_SECONDARY,
-            textAlign: 'center'
-          }}>
-            {title}
-          </Text>
-        </View>
-        {subtitle && (
-          <Text style={{
-            fontSize: 12,
-            color: 'rgba(221, 87, 70, 0.7)',
-            marginTop: 4,
-            textAlign: 'center'
-          }}>
-            {subtitle}
-          </Text>
-        )}
-      </View>
-    </View>
-    
-    {/* Loading Info Panel */}
-    <View style={{
-      marginBottom: 20,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 15,
-      backgroundColor: 'rgba(248, 250, 252, 0.8)',
-      borderRadius: 12,
-      paddingVertical: 12
-    }}>
-      <View style={{ flex: 1 }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginBottom: 8
-        }}>
-          <MaterialCommunityIcons 
-            name="database-sync" 
-            size={16} 
-            color={COLOR_PRIMARY} 
-            style={{ marginRight: 8 }}
-          />
-          <View style={[
-            styles.loadingSkeleton,
-            { height: 12, width: 120, borderRadius: 6 }
-          ]} />
-        </View>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center'
-        }}>
-          <MaterialCommunityIcons 
-            name="clock-outline" 
-            size={16} 
-            color={COLOR_PRIMARY} 
-            style={{ marginRight: 8 }}
-          />
-          <View style={[
-            styles.loadingSkeleton,
-            { height: 10, width: 80, borderRadius: 5 }
-          ]} />
-        </View>
-      </View>
-      
-      <View style={{
-        backgroundColor: 'rgba(255, 165, 0, 0.1)',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 165, 0, 0.3)',
-        flexDirection: 'row',
-        alignItems: 'center'
-      }}>
-        <View style={{
-          width: 6,
-          height: 6,
-          backgroundColor: 'orange',
-          borderRadius: 3,
-          marginRight: 6
-        }} />
-        <Text style={{
-          fontSize: 10,
-          color: 'orange',
-          fontWeight: '600'
-        }}>
-          LOADING
-        </Text>
-      </View>
-    </View>
-
-    {/* Loading Chart Area */}
-    <View style={{
-      backgroundColor: 'rgba(248, 250, 252, 0.6)',
-      borderRadius: 12,
-      marginHorizontal: 5,
-      padding: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: getScreenDimension().height / 2.5,
-      borderWidth: 1,
-      borderColor: 'rgba(226, 232, 240, 0.4)'
-    }}>
-      {/* Animated Loading Icon */}
-      <View style={{
-        backgroundColor: 'rgba(25, 118, 210, 0.1)',
-        borderRadius: 50,
-        padding: 20,
-        marginBottom: 16
-      }}>
-        <MaterialCommunityIcons 
-          name={
-            chartType === 'Period' ? 'chart-timeline' :
-            chartType === 'Monthly' ? 'chart-bar' : 'chart-line'
-          }
-          size={40} 
-          color={COLOR_PRIMARY}
-          style={{ opacity: 0.6 }}
-        />
-      </View>
-      
-      {/* Loading Text */}
-      <ActivityIndicator size="large" color={COLOR_PRIMARY} style={{ marginBottom: 16 }} />
-      <Text style={{
-        fontSize: 16,
-        fontWeight: '600',
-        color: COLOR_GRAY_2,
-        textAlign: 'center',
-        marginBottom: 8
-      }}>
-        Loading {chartType} Data
-      </Text>
-      <Text style={{
-        fontSize: 12,
-        color: 'rgba(107, 114, 128, 0.8)',
-        textAlign: 'center',
-        lineHeight: 18
-      }}>
-        Fetching water monitoring data...{'\n'}This may take a few moments
-      </Text>
-      
-      {/* Loading Progress Skeleton */}
-      <View style={{
-        width: '80%',
-        marginTop: 20,
-        gap: 8
-      }}>
-        {[40, 60, 30].map((width, index) => (
-          <View key={index} style={[
-            styles.loadingSkeleton,
-            { height: 4, width: `${width}%`, borderRadius: 2 }
-          ]} />
-        ))}
-      </View>
-    </View>
-    
-    {/* Loading Footer */}
-    <View style={{
-      marginTop: 20,
-      paddingHorizontal: 15,
-      paddingVertical: 12,
-      backgroundColor: 'rgba(25, 118, 210, 0.04)',
-      borderRadius: 8,
-      borderLeftWidth: 4,
-      borderLeftColor: COLOR_PRIMARY,
-      flexDirection: 'row',
-      alignItems: 'center'
-    }}>
-      <MaterialCommunityIcons 
-        name="information-outline" 
-        size={16} 
-        color={COLOR_PRIMARY}
-        style={{ marginRight: 8 }}
-      />
-      <Text style={{
-        fontSize: 12,
-        color: 'rgba(25, 118, 210, 0.8)',
-        fontStyle: 'italic',
-        flex: 1
-      }}>
-        Chart will display automatically once data is loaded • Please wait
-      </Text>
-    </View>
-  </View>
-);
 
 // ===== MAIN DASHBOARD COMPONENT =====
 
@@ -338,95 +132,76 @@ const Dashboard = ({
   isForecastLoading, 
   onLogoutPressed 
 }) => {
-  // ===== STATE MANAGEMENT =====
-  
-  /** @type {[Date, Function]} Date selection states */
-  const [startDate, setStartDate] = useState(new Date())
-  const [finishDate, setFinishDate] = useState(new Date())
-  
-  /** @type {[boolean, Function]} Modal visibility states */
-  const [modalStartDate, setModalStartDate] = useState(false)
-  const [showModalInfo, setShowModalInfo] = useState(false)
-  const [modalConfirm, setModalConfirm] = useState('')
-  
-  /** @type {[string, Function]} Info message state */
-  const [messageInfo, setMessageInfo] = useState('')
+  // ===== CUSTOM HOOKS INITIALIZATION =====
+  const dateSelection = useDateSelection();
+  const modalManagement = useModalManagement();
+  const responsiveLayout = useResponsiveLayout();
+  const refreshControl = useRefreshControl(onRefreshAllData);
+  const chartData = useChartData({
+    waterBenderAvgDistance,
+    waterBenderLast,
+    waterBenderAvg,
+    waterBenderMonthly,
+    waterBenderPeriod,
+    waterBenderDaily,
+    waterBenderForecast,
+    startDate: dateSelection.startDate
+  });
 
-  /** @type {[boolean, Function]} Pull to refresh state */
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  // ===== DESTRUCTURED HOOK VALUES =====
+  const { startDate, finishDate, setStartDate, setFinishDate, modalStartDate, setModalStartDate } = dateSelection;
+  const { showModalInfo, modalConfirm, messageInfo, showInfoModal, hideInfoModal, hideConfirmModal } = modalManagement;
+  const { isLandscape } = responsiveLayout;
+  const { isRefreshing, refreshControlProps } = refreshControl;
+  const { 
+    generateChartWaterBenderPeriod,
+    generateChartWaterBenderMonthly,
+    generateChartWaterBenderDailyWithForecast,
+    isChartsLoading,
+    isPeriodLoading,
+    setDataCache
+  } = chartData;
 
-  // ===== API OPTIMIZATION STATE =====
-  const [dataCache, setDataCache] = useState({
-    lastLoaded: null,
-    dailyLoaded: false,
-    monthlyYear: null,
-    forecastLoaded: false
-  })
+  // ===== DEBUG CHART DATA =====
+  console.log('🔍 Dashboard Chart Debug:', {
+    isLoading,
+    isChartsLoading,
+    periodDataLength: generateChartWaterBenderPeriod?.length || 0,
+    monthlyDataLength: generateChartWaterBenderMonthly?.length || 0,
+    periodData: !!generateChartWaterBenderPeriod,
+    monthlyData: !!generateChartWaterBenderMonthly,
+    rawPeriodData: waterBenderPeriod?.length || 0,
+    rawMonthlyData: waterBenderMonthly?.length || 0
+  });
 
-  // ===== RESPONSIVE LAYOUT DETECTION =====
-  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'))
-  const isLandscape = screenDimensions.width > screenDimensions.height
-
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      setScreenDimensions(window)
-    })
-    return () => subscription?.remove()
-  }, [])
-
-  // ===== CHART DATA PROCESSING =====
-  
-  /** 
-   * Chart data variables - processed from raw API data
-   * These variables will hold the processed chart data for different chart types
-   */
-  let generateChartWaterBenderAvgDistance, 
-      generateChartWaterBenderPeriod, 
-      generateChartWaterBenderMonthly
-
-  /**
-   * Process chart data for Period, Monthly charts
-   * Only process if all required data is available
-   */
-  if(waterBenderAvgDistance && waterBenderLast && waterBenderAvg && waterBenderMonthly && waterBenderPeriod) {
-    generateChartWaterBenderAvgDistance = generateChartData(waterBenderAvgDistance, 1);
-    generateChartWaterBenderPeriod = generateChartData(waterBenderPeriod, 2);
-    generateChartWaterBenderMonthly = generateChartData(waterBenderMonthly, 3);
-  }
-
-  // ===== OPTIMIZED REAL-TIME CHART GENERATION =====
-  
-  /**
-   * PERFORMANCE OPTIMIZED: Simplified chart processing
-   * Removed React.useMemo overhead, using direct processing like Period/Monthly charts
-   * This eliminates dual dependency complexity and improves rendering performance
-   */
-  const generateChartWaterBenderDailyWithForecast = (() => {
-    if (!waterBenderDaily) {
-      console.log('⚠️ No daily water data available');
-      return [];
+  // ===== DEBUG PERIOD LOADING STATE =====
+  const periodLoadingState = isPeriodLoading || !generateChartWaterBenderPeriod || generateChartWaterBenderPeriod.length === 0;
+  console.log('📊 Period Loading State Debug:', {
+    isPeriodLoading,
+    hasPeriodData: !!generateChartWaterBenderPeriod,
+    periodLength: generateChartWaterBenderPeriod?.length || 0,
+    finalLoadingState: periodLoadingState,
+    optimizedCondition: 'Added isPeriodLoading for date changes',
+    breakdown: {
+      dateChangeLoading: isPeriodLoading,
+      noData: !generateChartWaterBenderPeriod,
+      emptyArray: generateChartWaterBenderPeriod?.length === 0
     }
+  });
 
-    console.log('📊 Processing optimized chart data for daily/hourly with forecast...');
-    
-    // Direct processing without memoization overhead
-    let chartData;
-    if (waterBenderForecast && waterBenderForecast.length > 0) {
-      console.log('🔮 Generating combined chart with forecast data');
-      chartData = generateDailyChartWithForecast(waterBenderDaily, waterBenderForecast);
-    } else {
-      console.log('📈 Generating chart with actual data only');
-      chartData = generateChartData(waterBenderDaily, 1);
+  // ===== DEBUG MONTHLY LOADING STATE =====
+  const monthlyLoadingState = !generateChartWaterBenderMonthly || generateChartWaterBenderMonthly.length === 0;
+  console.log('📊 Monthly Loading State Debug:', {
+    isChartsLoading,
+    hasMonthlyData: !!generateChartWaterBenderMonthly,
+    monthlyLength: generateChartWaterBenderMonthly?.length || 0,
+    finalLoadingState: monthlyLoadingState,
+    optimizedCondition: 'Removed isChartsLoading dependency',
+    breakdown: {
+      noData: !generateChartWaterBenderMonthly,
+      emptyArray: generateChartWaterBenderMonthly?.length === 0
     }
-    
-    console.log('✅ Optimized chart data processing completed:', {
-      totalPoints: chartData.length,
-      actualPoints: chartData.filter(d => d.isActual).length,
-      forecastPoints: chartData.filter(d => d.isForecast).length
-    });
-    
-    return chartData;
-  })();
+  });
 
   // ===== COMPONENT LIFECYCLE EFFECTS =====
   
@@ -439,52 +214,19 @@ const Dashboard = ({
     const today = moment().format('YYYY-MM-DD')
     const selectedDate = moment(startDate).format('YYYY-MM-DD')
     
-    console.log('📊 Smart API Loading - Checking what needs to be loaded:', {
-      selectedDate,
-      currentYear,
-      isToday: selectedDate === today,
-      cacheState: dataCache
-    })
-
-    // Panggil onAppear dengan flag untuk menentukan API mana yang perlu dipanggil
+    // Smart API loading based on cache state
     onAppear(startDate, finishDate, {
-      needsLastData: !dataCache.lastLoaded,
-      needsDailyData: !dataCache.dailyLoaded && selectedDate === today,
-      needsMonthlyData: dataCache.monthlyYear !== currentYear,
-      needsForecastData: !dataCache.forecastLoaded && selectedDate === today
+      needsLastData: !chartData.dataCache.lastLoaded,
+      needsDailyData: !chartData.dataCache.dailyLoaded && selectedDate === today,
+      needsMonthlyData: chartData.dataCache.monthlyYear !== currentYear,
+      needsForecastData: !chartData.dataCache.forecastLoaded && selectedDate === today
     })
-
-    // Update cache state
-    setDataCache(prev => ({
-      ...prev,
-      lastLoaded: !prev.lastLoaded ? new Date().toISOString() : prev.lastLoaded,
-      dailyLoaded: selectedDate === today ? true : prev.dailyLoaded,
-      monthlyYear: currentYear,
-      forecastLoaded: selectedDate === today ? true : prev.forecastLoaded
-    }))
   }, [startDate, finishDate])
 
-  /**
-   * OPTIMIZED: Reset cache ketika user logout atau refresh manual
-   */
-  const resetDataCache = () => {
-    setDataCache({
-      lastLoaded: null,
-      dailyLoaded: false,
-      monthlyYear: null,
-      forecastLoaded: false
-    })
-  }
-
-  // ===== HELPER FUNCTIONS =====
-  
-  /**
-   * Handle modal confirmations and actions
-   */
+  // ===== EVENT HANDLERS =====
   const handleLogoutConfirm = () => {
-    // Reset cache sebelum logout untuk session berikutnya
-    resetDataCache();
-    setModalConfirm(false);
+    resetDataCache(setDataCache);
+    hideConfirmModal();
     onLogoutPressed();
   };
 
@@ -492,384 +234,40 @@ const Dashboard = ({
     setModalStartDate(!modalStartDate);
   };
 
-  const handleInfoModal = (message) => {
-    setMessageInfo(message);
-    setShowModalInfo(true);
+  const closeDateModal = () => {
+    setModalStartDate(false);
   };
 
-  /**
-   * OPTIMIZED: Handle manual refresh dengan cache reset
-   */
-  const handleManualRefresh = () => {
-    console.log('🔄 Manual refresh triggered - resetting cache');
-    resetDataCache();
-    
-    // Force refresh all data
-    if (onRefreshAllData) {
-      onRefreshAllData(startDate, finishDate);
-    }
-  };
-
-  /**
-   * Handle pull-to-refresh action
-   * Refreshes all data and resets cache
-   */
-  const onPullToRefresh = async () => {
-    console.log('📱 Pull-to-refresh triggered');
-    setIsRefreshing(true);
-    
-    try {
-      // Reset cache untuk memaksa reload semua data
-      resetDataCache();
-      
-      // Call refresh function dengan force reload
-      if (onRefreshAllData) {
-        await onRefreshAllData(startDate, finishDate, true); // true untuk force refresh
-      }
-      
-      console.log('✅ Pull-to-refresh completed successfully');
-    } catch (error) {
-      console.error('❌ Pull-to-refresh failed:', error);
-    } finally {
-      // Set delay minimum untuk user experience yang baik
-      setTimeout(() => {
-        setIsRefreshing(false);
-      }, 500);
-    }
+  const handleQuickFilterSelect = (newStartDate, newFinishDate) => {
+    utilHandleQuickFilter(
+      newStartDate, 
+      newFinishDate,
+      setStartDate,
+      setFinishDate,
+      onAppear
+    );
   };
 
   // ===== RENDER METHODS =====
-  
-  /**
-   * Render modern water depth info cards with enhanced design
-   * @returns {JSX.Element} Enhanced water depth cards component
-   */
   const renderWaterDepthCards = () => (
-    <View style={{ 
-      justifyContent: "space-evenly", 
-      flexDirection: "row", 
-      justifyContent: "space-between",
-      marginHorizontal: 5,
-      marginBottom: 25,
-      marginTop: 15
-    }}>
-      {/* Latest Water Depth Card */}
-      <View style={[
-        styles.modernCard,
-        { 
-          width: "48%",
-          backgroundColor: COLOR_PRIMARY,
-          borderRadius: 20,
-          padding: 20,
-          shadowColor: COLOR_PRIMARY,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.25,
-          shadowRadius: 15,
-          elevation: 8,
-        }
-      ]}>
-        {/* Header with Icon */}
-        <View style={{ 
-          flexDirection: 'row', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          marginBottom: 16 
-        }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.9)',
-              fontSize: 12,
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: 0.8
-            }}>
-              CURRENT DEPTH
-            </Text>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: 10,
-              marginTop: 2,
-              fontWeight: '400'
-            }}>
-              Last 1 hour reading
-            </Text>
-          </View>
-          
-          <View style={{
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 12,
-            padding: 10,
-          }}>
-            <MaterialCommunityIcons 
-              name="waves"
-              size={24} 
-              color="rgba(255,255,255,0.95)" 
-            />
-          </View>
-        </View>
-
-        {/* Value Display */}
-        <View style={{ alignItems: 'flex-start', marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ 
-              color: '#FFFFFF',
-              fontSize: 34,
-              fontWeight: '800',
-              letterSpacing: -1.5
-            }}>
-              {waterBenderLast || '0.0'}
-            </Text>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.8)',
-              fontSize: 16,
-              fontWeight: '600',
-              marginLeft: 6,
-              marginBottom: 6
-            }}>
-              m
-            </Text>
-          </View>
-        </View>
-
-        {/* Status Indicator */}
-        <View style={{ 
-          flexDirection: 'row', 
-          alignItems: 'center',
-          backgroundColor: 'rgba(255,255,255,0.15)',
-          borderRadius: 25,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          alignSelf: 'flex-start'
-        }}>
-          <View style={{
-            width: 8,
-            height: 8,
-            backgroundColor: '#4CAF50',
-            borderRadius: 4,
-            marginRight: 8
-          }} />
-          <Text style={{ 
-            color: 'rgba(255,255,255,0.95)',
-            fontSize: 11,
-            fontWeight: '600'
-          }}>
-            LIVE DATA
-          </Text>
-        </View>
-      </View>
-
-      {/* Average Water Depth Card - Modern Design */}
-      <View style={[
-        styles.modernCard,
-        { 
-          width: "48%",
-          backgroundColor: COLOR_MAIN_SECONDARY,
-          borderRadius: 20,
-          padding: 20,
-          shadowColor: COLOR_MAIN_SECONDARY,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.25,
-          shadowRadius: 15,
-          elevation: 8,
-        }
-      ]}>
-        {/* Header with Icon */}
-        <View style={{ 
-          flexDirection: 'row', 
-          justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          marginBottom: 16 
-        }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.9)',
-              fontSize: 12,
-              fontWeight: '600',
-              textTransform: 'uppercase',
-              letterSpacing: 0.8
-            }}>
-              DAILY AVERAGE
-            </Text>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.7)',
-              fontSize: 10,
-              marginTop: 2,
-              fontWeight: '400'
-            }}>
-              {moment(startDate).format('DD MMM YYYY')}
-            </Text>
-          </View>
-          
-          <View style={{
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 12,
-            padding: 10,
-          }}>
-            <MaterialCommunityIcons 
-              name="chart-line-variant"
-              size={24} 
-              color="rgba(255,255,255,0.95)" 
-            />
-          </View>
-        </View>
-
-        {/* Value Display */}
-        <View style={{ alignItems: 'flex-start', marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-            <Text style={{ 
-              color: '#FFFFFF',
-              fontSize: 34,
-              fontWeight: '800',
-              letterSpacing: -1.5
-            }}>
-              {waterBenderAvg || '0.0'}
-            </Text>
-            <Text style={{ 
-              color: 'rgba(255,255,255,0.8)',
-              fontSize: 16,
-              fontWeight: '600',
-              marginLeft: 6,
-              marginBottom: 6
-            }}>
-              m
-            </Text>
-          </View>
-        </View>
-
-        {/* Trend Indicator */}
-        <View style={{ 
-          flexDirection: 'row', 
-          alignItems: 'center',
-          backgroundColor: 'rgba(255,255,255,0.15)',
-          borderRadius: 25,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          alignSelf: 'flex-start'
-        }}>
-          <MaterialCommunityIcons 
-            name="trending-up" 
-            size={14} 
-            color="rgba(255,255,255,0.95)" 
-            style={{ marginRight: 6 }}
-          />
-          <Text style={{ 
-            color: 'rgba(255,255,255,0.95)',
-            fontSize: 11,
-            fontWeight: '600'
-          }}>
-            STABLE
-          </Text>
-        </View>
-      </View>
-    </View>
+    <WaterDepthCards 
+      currentDepth={waterBenderLast}
+      averageDepth={waterBenderAvg}
+      selectedDate={startDate}
+    />
   );
 
   /**
    * Render modern date selection section
    */
   const renderDateSelection = () => (
-    <View style={styles.modernDateSection}>
-      {/* Section Header */}
-      <View style={styles.sectionHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <MaterialCommunityIcons 
-            name="calendar-range" 
-            size={22} 
-            color={COLOR_WHITE} 
-          />
-          <Text style={styles.sectionTitle}>Date Range Selection</Text>
-        </View>
-        
-        {/* Refresh Status Indicator */}
-        {isRefreshing && (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: 'rgba(255,255,255,0.2)',
-            borderRadius: 15,
-            paddingHorizontal: 12,
-            paddingVertical: 6
-          }}>
-            <ActivityIndicator size="small" color={COLOR_WHITE} style={{ marginRight: 6 }} />
-            <Text style={{
-              fontSize: 12,
-              color: COLOR_WHITE,
-              fontWeight: '600'
-            }}>
-              Refreshing...
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Modern Date Selector Card - Hidden in Landscape for Better Space Usage */}
-      {!isLandscape && (
-        <View style={styles.dateCard}>
-          <TouchableOpacity 
-            style={styles.dateSelector}
-            onPress={handleModalStartDateToggle}
-            activeOpacity={0.8}
-          >
-            <View style={styles.dateSelectorContent}>
-              <View style={styles.dateIconContainer}>
-                <MaterialCommunityIcons 
-                  name="calendar-check-outline" 
-                  size={24} 
-                  color={COLOR_PRIMARY} 
-                />
-              </View>
-              
-              <View style={styles.dateTextContainer}>
-                <Text style={styles.dateLabel}>Selected Date Range</Text>
-                <Text style={styles.dateValue}>
-                  {moment(startDate).format('DD MMMM YYYY')}
-                </Text>
-                <View style={styles.dateRangeTag}>
-                  <Text style={styles.dateRangeText}>3-day range</Text>
-                </View>
-              </View>
-              
-              <View style={styles.chevronContainer}>
-                <MaterialCommunityIcons 
-                  name="chevron-right" 
-                  size={20} 
-                  color={COLOR_PRIMARY} 
-                  style={{ opacity: 0.6 }}
-                />
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          {/* Quick Date Filters */}
-          <View style={styles.quickFilters}>
-            <Text style={styles.quickFiltersTitle}>Quick Select:</Text>
-            <View style={styles.quickFiltersRow}>
-              {[
-                { label: 'Today', days: 0 },
-                { label: 'Yesterday', days: -1 },
-                { label: 'Last Week', days: -7 }
-              ].map((filter, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.quickFilterButton}
-                  onPress={() => {
-                    const date = new Date();
-                    date.setDate(date.getDate() + filter.days);
-                    setStartDate(date);
-                    const finishDate = new Date(date);
-                    finishDate.setDate(finishDate.getDate() + 3);
-                    setFinishDate(finishDate);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.quickFilterText}>{filter.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      )}
-    </View>
+    <DateSelectionSection 
+      selectedDate={startDate}
+      isRefreshing={isRefreshing}
+      isLandscape={isLandscape}
+      onDatePickerPress={handleModalStartDateToggle}
+      onQuickFilterSelect={handleQuickFilterSelect}
+    />
   );
 
   // ===== MAIN RENDER =====
@@ -924,17 +322,7 @@ const Dashboard = ({
         
         {/* Scrollable Content with Pull-to-Refresh */}
         <ScrollView
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onPullToRefresh}
-              colors={[COLOR_PRIMARY, COLOR_MAIN_SECONDARY]}
-              tintColor={COLOR_PRIMARY}
-              title="Pull to refresh data..."
-              titleColor={COLOR_GRAY_2}
-              progressBackgroundColor={COLOR_WHITE}
-            />
-          }
+          refreshControl={<RefreshControl {...refreshControlProps} />}
         >
         {/* Date Selection Section */}
         {renderDateSelection()}
@@ -949,494 +337,54 @@ const Dashboard = ({
             {renderWaterDepthCards()}
             
             {/* Charts Section */}
-            {!isLoading ? (
+            {!isLoading && !isChartsLoading ? (
               <View>
                 {/* Period Chart Section */}
-                {generateChartWaterBenderPeriod && generateChartWaterBenderPeriod.length > 0 ? (
-                  <View style={[styles.card, { marginTop: 20 }]}>
-                    <View style={{ width: "100%", marginTop: 10 }}>
-                      <Text style={{ 
-                        bottom: 24, 
-                        padding: 7, 
-                        textAlign: "center", 
-                        borderRadius: 3, 
-                        fontWeight: "bold", 
-                        fontSize: 15, 
-                        backgroundColor: COLOR_MAIN_SECONDARY, 
-                        color: COLOR_WHITE 
-                      }}>
-                        Water Surface By Period
-                      </Text>
-                    </View>
-                  
-                  {/* Chart Info */}
-                  <View style={{
-                    marginTop: 10,
-                    marginBottom: 10,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: 15,
-                  }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        fontSize: 12,
-                        color: COLOR_GRAY_2,
-                        fontWeight: '500'
-                      }}>
-                        📊 Period Data Points: {(generateChartWaterBenderPeriod || []).length}
-                      </Text>
-                      <Text style={{
-                        fontSize: 11,
-                        color: COLOR_GRAY_2,
-                        marginTop: 2
-                      }}>
-                        Date Range: {moment(startDate).format('DD MMM')} - {moment(finishDate).format('DD MMM')}
-                      </Text>
-                    </View>
-                    
-                    <View style={{
-                      backgroundColor: 'rgba(221, 87, 70, 0.1)',
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 15,
-                      borderWidth: 1,
-                      borderColor: 'rgba(221, 87, 70, 0.2)'
-                    }}>
-                      <Text style={{
-                        fontSize: 10,
-                        color: COLOR_MAIN_SECONDARY,
-                        fontWeight: 'bold',
-                        textAlign: 'center'
-                      }}>
-                        PERIOD
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Responsive Chart Container with Horizontal Scroll */}
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={true}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: 10,
-                      marginHorizontal: 5,
-                      shadowColor: "#000",
-                      shadowOffset: {
-                        width: 0,
-                        height: 2,
-                      },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 3.84,
-                      elevation: 5,
-                    }}
-                    contentContainerStyle={{
-                      padding: 15,
-                      minWidth: getScreenDimension().width - 10
-                    }}
-                  >
-                    <LineChart
-                      areaChart
-                      curved
-                      noOfSections={6}
-                      spacing={Math.max(80, Math.min(100, getScreenDimension().width / Math.max(generateChartWaterBenderPeriod?.length || 1, 1)))}
-                      data={generateChartWaterBenderPeriod}
-                      yAxisLabelWidth={60}
-                      maxValue={calculateMaxValue(generateChartWaterBenderPeriod || [])}
-                      xAxisThickness={1}
-                      yAxisThickness={1}
-                      yAxisTextStyle={{ color: COLOR_GRAY_2, fontSize: 12, fontWeight: '500' }}
-                      xAxisLabelTextStyle={{ 
-                        color: COLOR_GRAY_2, 
-                        textAlign: 'center', 
-                        fontSize: 8, 
-                        fontWeight: '400',
-                        width: 60,
-                        flexWrap: 'wrap'
-                      }}
-                      width={Math.max(
-                        getScreenDimension().width - 80,
-                        (generateChartWaterBenderPeriod || []).length * 100 + 100
-                      )}
-                      height={getScreenDimension().height / 1.8} // Tinggi lebih besar untuk accommodate multiline labels
-                      startFillColor="rgb(221, 87, 70)"
-                      startOpacity={0.8}
-                      endFillColor="rgb(255, 122, 104)"
-                      endOpacity={0.1}
-                      color="rgb(221, 87, 70)"
-                      stripColor="rgba(221, 87, 70, 0.3)"
-                      stripOpacity={0.3}
-                      stripWidth={2}
-                      isAnimated
-                      animationDuration={1200}
-                      pointerConfig={createPointerConfig(chartPresets.colors, 'period')}
-                      initialSpacing={10}
-                      endSpacing={20}
-                    />
-                  </ScrollView>
-                  
-                  {/* Additional Info */}
-                  <View style={{
-                    marginTop: 15,
-                    paddingHorizontal: 15,
-                    paddingVertical: 10,
-                    backgroundColor: 'rgba(221, 87, 70, 0.05)',
-                    borderRadius: 8,
-                    borderLeftWidth: 4,
-                    borderLeftColor: COLOR_MAIN_SECONDARY
-                  }}>
-                    <Text style={{
-                      fontSize: 12,
-                      color: COLOR_GRAY_2,
-                      fontStyle: 'italic',
-                      textAlign: 'center'
-                    }}>
-                      📊 Swipe/Tap on chart for detailed values • Period-based water surface data
-                    </Text>
-                  </View>
-                </View>
-                ) : (
-                  <ChartLoadingSkeleton 
-                    chartType="Period"
-                    title="Loading Water Surface By Period"
-                    subtitle="Processing period-based water surface data"
-                  />
-                )}
+                <PeriodChartSection 
+                  chartData={generateChartWaterBenderPeriod}
+                  isLoading={periodLoadingState}
+                  startDate={startDate}
+                  finishDate={finishDate}
+                  style={{ marginTop: 20 }}
+                />
 
                 {/* Monthly Chart Section */}
-                {generateChartWaterBenderMonthly && generateChartWaterBenderMonthly.length > 0 ? (
-                <View style={[styles.card, { marginTop: 20 }]}>
-                  <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ 
-                      bottom: 24, 
-                      padding: 7, 
-                      textAlign: "center", 
-                      borderRadius: 3, 
-                      fontWeight: "bold", 
-                      fontSize: 15, 
-                      backgroundColor: COLOR_MAIN_SECONDARY, 
-                      color: COLOR_WHITE 
-                    }}>
-                      Water Surface By Monthly
-                    </Text>
-                  </View>
-                  
-                  {/* Chart Info */}
-                  <View style={{
-                    marginTop: 10,
-                    marginBottom: 10,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: 15,
-                  }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        fontSize: 12,
-                        color: COLOR_GRAY_2,
-                        fontWeight: '500'
-                      }}>
-                        📊 Monthly Data Points: {(generateChartWaterBenderMonthly || []).length}
-                      </Text>
-                      <Text style={{
-                        fontSize: 11,
-                        color: COLOR_GRAY_2,
-                        marginTop: 2
-                      }}>
-                        Year Overview: {moment().format('YYYY')}
-                      </Text>
-                    </View>
-                    
-                    <View style={{
-                      backgroundColor: 'rgba(221, 87, 70, 0.1)',
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 15,
-                      borderWidth: 1,
-                      borderColor: 'rgba(221, 87, 70, 0.2)'
-                    }}>
-                      <Text style={{
-                        fontSize: 10,
-                        color: COLOR_MAIN_SECONDARY,
-                        fontWeight: 'bold',
-                        textAlign: 'center'
-                      }}>
-                        MONTHLY
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Responsive Chart Container with Horizontal Scroll */}
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={true}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: 10,
-                      marginHorizontal: 5,
-                      shadowColor: "#000",
-                      shadowOffset: {
-                        width: 0,
-                        height: 2,
-                      },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 3.84,
-                      elevation: 5,
-                    }}
-                    contentContainerStyle={{
-                      padding: 15,
-                      minWidth: getScreenDimension().width - 10
-                    }}
-                  >
-                    <LineChart
-                      areaChart
-                      curved
-                      noOfSections={6}
-                      spacing={Math.max(70, Math.min(90, getScreenDimension().width / Math.max(generateChartWaterBenderMonthly?.length || 1, 1)))}
-                      data={generateChartWaterBenderMonthly}
-                      yAxisLabelWidth={60}
-                      maxValue={calculateMaxValue(generateChartWaterBenderMonthly || [])}
-                      xAxisThickness={1}
-                      yAxisThickness={1}
-                      yAxisTextStyle={{ color: COLOR_GRAY_2, fontSize: 12, fontWeight: '500' }}
-                      xAxisLabelTextStyle={{ color: COLOR_GRAY_2, textAlign: 'center', fontSize: 11, fontWeight: '400' }}
-                      width={Math.max(
-                        getScreenDimension().width - 80,
-                        (generateChartWaterBenderMonthly || []).length * 90 + 100
-                      )}
-                      height={getScreenDimension().height / 2.1}
-                      startFillColor="rgb(221, 87, 70)"
-                      startOpacity={0.8}
-                      endFillColor="rgb(255, 122, 104)"
-                      endOpacity={0.1}
-                      color="rgb(221, 87, 70)"
-                      stripColor="rgba(221, 87, 70, 0.3)"
-                      stripOpacity={0.3}
-                      stripWidth={2}
-                      isAnimated
-                      animationDuration={1200}
-                      pointerConfig={createPointerConfig(chartPresets.colors, 'monthly')}
-                      initialSpacing={10}
-                      endSpacing={20}
-                    />
-                  </ScrollView>
-                  
-                  {/* Additional Info */}
-                  <View style={{
-                    marginTop: 15,
-                    paddingHorizontal: 15,
-                    paddingVertical: 10,
-                    backgroundColor: 'rgba(221, 87, 70, 0.05)',
-                    borderRadius: 8,
-                    borderLeftWidth: 4,
-                    borderLeftColor: COLOR_MAIN_SECONDARY
-                  }}>
-                    <Text style={{
-                      fontSize: 12,
-                      color: COLOR_GRAY_2,
-                      fontStyle: 'italic',
-                      textAlign: 'center'
-                    }}>
-                      📊 Swipe/Tap on chart for detailed values • Monthly water surface trends
-                    </Text>
-                  </View>
-                </View>
-                ) : (
-                  <ChartLoadingSkeleton 
-                    chartType="Monthly"
-                    title="Loading Water Surface By Monthly"
-                    subtitle="Processing monthly water surface trends"
-                  />
-                )}
+                <MonthlyChartSection 
+                  data={generateChartWaterBenderMonthly}
+                  loading={monthlyLoadingState}
+                  style={{ marginTop: 20 }}
+                />
 
                 {/* Daily/Hourly Chart Section */}
-                {generateChartWaterBenderDailyWithForecast && generateChartWaterBenderDailyWithForecast.length > 0 ? (
-                <View style={[styles.card, { marginTop: 20, }]}>
-                  <View style={{ width: "100%", marginTop: 10 }}>
-                    <Text style={{ 
-                      bottom: 24, 
-                      padding: 7, 
-                      textAlign: "center", 
-                      borderRadius: 3, 
-                      fontWeight: "bold", 
-                      fontSize: 15, 
-                      backgroundColor: COLOR_MAIN_SECONDARY, 
-                      color: COLOR_WHITE 
-                    }}>
-                      Water Surface By Hourly (with Forecast)
-                    </Text>
-                  </View>
-                  
-                  {/* Chart Info - ADOPSI PATTERN DARI PERIOD & MONTHLY */}
-                  <View style={{
-                    marginTop: 10,
-                    marginBottom: 10,
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: 15,
-                  }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{
-                        fontSize: 12,
-                        color: COLOR_GRAY_2,
-                        fontWeight: '500'
-                      }}>
-                        📊 Hourly Data Points: {(generateChartWaterBenderDailyWithForecast || []).length}
-                      </Text>
-                      <Text style={{
-                        fontSize: 11,
-                        color: COLOR_GRAY_2,
-                        marginTop: 2
-                      }}>
-                        Actual: {(generateChartWaterBenderDailyWithForecast || []).filter(d => d.isActual).length} | 
-                        Forecast: {(generateChartWaterBenderDailyWithForecast || []).filter(d => d.isForecast).length}
-                        {isForecastLoading && <Text style={{ color: COLOR_PRIMARY }}> ⟳</Text>}
-                      </Text>
-                    </View>
-                    
-                    <View style={{
-                      backgroundColor: 'rgba(221, 87, 70, 0.1)',
-                      paddingHorizontal: 10,
-                      paddingVertical: 6,
-                      borderRadius: 15,
-                      borderWidth: 1,
-                      borderColor: 'rgba(221, 87, 70, 0.2)'
-                    }}>
-                      <Text style={{
-                        fontSize: 10,
-                        color: COLOR_MAIN_SECONDARY,
-                        fontWeight: 'bold',
-                        textAlign: 'center'
-                      }}>
-                        HOURLY
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Responsive Chart Container - ADOPSI PATTERN DARI PERIOD & MONTHLY */}
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={true}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: 10,
-                      marginHorizontal: 5,
-                      shadowColor: "#000",
-                      shadowOffset: {
-                        width: 0,
-                        height: 2,
-                      },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 3.84,
-                      elevation: 5,
-                    }}
-                    contentContainerStyle={{
-                      padding: 15,
-                      minWidth: getScreenDimension().width - 10
-                    }}
-                  >
-                    <LineChart
-                      areaChart
-                      curved={false}
-                      noOfSections={6}
-                      // ADOPSI: Responsive spacing seperti Period & Monthly charts
-                      spacing={Math.max(60, Math.min(80, getScreenDimension().width / Math.max(generateChartWaterBenderDailyWithForecast?.length || 1, 1)))}
-                      data={generateChartWaterBenderDailyWithForecast}
-                      yAxisLabelWidth={60}
-                      maxValue={calculateMaxValue(generateChartWaterBenderDailyWithForecast)}
-                      // ADOPSI: Consistent width calculation seperti Period & Monthly
-                      width={Math.max(
-                        getScreenDimension().width - 80,
-                        (generateChartWaterBenderDailyWithForecast || []).length * 70 + 100
-                      )}
-                      // ADOPSI: Consistent height seperti Period & Monthly 
-                      height={getScreenDimension().height / 1.8}
-                      xAxisThickness={1}
-                      yAxisThickness={1}
-                      yAxisTextStyle={{ 
-                        color: COLOR_GRAY_2, 
-                        fontSize: 12,
-                        fontWeight: '500'
-                      }}
-                      xAxisLabelTextStyle={{ 
-                        color: COLOR_GRAY_2, 
-                        textAlign: 'center', 
-                        fontSize: 11,
-                        fontWeight: '400'
-                      }}
-                      // Multi-color support for actual vs forecast
-                      startFillColor="rgb(221, 87, 70)"
-                      startOpacity={0.8}
-                      endFillColor="rgb(255, 122, 104)"
-                      endOpacity={0.1}
-                      color="rgb(221, 87, 70)"
-                      // Dynamic colors berdasarkan forecast
-                      dataPointsColor={(index) => {
-                        if (generateChartWaterBenderDailyWithForecast[index]) {
-                          return generateChartWaterBenderDailyWithForecast[index].isForecast 
-                            ? COLOR_PRIMARY
-                            : COLOR_MAIN_SECONDARY;
-                        }
-                        return COLOR_MAIN_SECONDARY;
-                      }}
-                      stripColor="rgba(221, 87, 70, 0.3)"
-                      stripOpacity={0.3}
-                      stripWidth={2}
-                      isAnimated
-                      animationDuration={1200}
-                      pointerConfig={createPointerConfig(chartPresets.colors, 'daily')}
-                      initialSpacing={10}
-                      endSpacing={20}
-                    />
-                  </ScrollView>
-                  
-                  {/* Additional Info - ADOPSI PATTERN DARI PERIOD & MONTHLY */}
-                  <View style={{
-                    marginTop: 15,
-                    paddingHorizontal: 15,
-                    paddingVertical: 10,
-                    backgroundColor: 'rgba(221, 87, 70, 0.05)',
-                    borderRadius: 8,
-                    borderLeftWidth: 4,
-                    borderLeftColor: COLOR_MAIN_SECONDARY
-                  }}>
-                    <Text style={{
-                      fontSize: 12,
-                      color: COLOR_GRAY_2,
-                      fontStyle: 'italic',
-                      textAlign: 'center'
-                    }}>
-                      📊 Swipe/Tap on chart for detailed values • Red: Real-time data • Blue: 12-hour forecast
-                    </Text>
-                  </View>
-                </View>
-                ) : (
-                  <ChartLoadingSkeleton 
-                    chartType="Hourly"
-                    title="Loading Water Surface By Hourly (with Forecast)"
-                    subtitle="Processing real-time data and forecast predictions"
-                  />
-                )}
+                <DailyHourlyChartSection 
+                  data={generateChartWaterBenderDailyWithForecast}
+                  loading={isChartsLoading || !generateChartWaterBenderDailyWithForecast || generateChartWaterBenderDailyWithForecast.length === 0}
+                  isForecastLoading={isForecastLoading}
+                  getDataPointLineColors={getDataPointLineColors}
+                  style={{ marginTop: 20 }}
+                />
               </View>
             ) : (
               /* Loading State for All Charts */
               <View>
-                <ChartLoadingSkeleton 
-                  chartType="Period"
-                  title="Loading Water Surface By Period"
-                  subtitle="Processing period-based water surface data"
+                <PeriodChartSection 
+                  chartData={[]}
+                  isLoading={true}
+                  startDate={startDate}
+                  finishDate={finishDate}
+                  style={{ marginTop: 20 }}
                 />
-                <ChartLoadingSkeleton 
-                  chartType="Monthly"
-                  title="Loading Water Surface By Monthly"
-                  subtitle="Processing monthly water surface trends"
+                <MonthlyChartSection 
+                  data={[]}
+                  loading={true}
+                  style={{ marginTop: 20 }}
                 />
-                <ChartLoadingSkeleton 
-                  chartType="Hourly"
-                  title="Loading Water Surface By Hourly (with Forecast)"
-                  subtitle="Processing real-time data and forecast predictions"
+                <DailyHourlyChartSection 
+                  data={[]}
+                  loading={true}
+                  isForecastLoading={false}
+                  getDataPointLineColors={getDataPointLineColors}
+                  style={{ marginTop: 20 }}
                 />
               </View>
             )}
@@ -1447,16 +395,17 @@ const Dashboard = ({
       
       {/* Modal Components */}
       <MyModalConfirm
-        isVisible={modalConfirm}
-        closeModal={() => setModalConfirm(false)}
+        isVisible={!!modalConfirm}
+        closeModal={hideConfirmModal}
         onSubmit={handleLogoutConfirm}
         message={"Apakah anda yakin ingin log out ?"}
       />
       
+      
       {/* Enhanced Date Selection Modal */}
       <MyModal 
         isVisible={modalStartDate} 
-        closeModal={() => setModalStartDate(!modalStartDate)}
+        closeModal={closeDateModal}
         headerActive={true}
         headerTitle="Select Date Range"
         headerColor={'transparent'}
@@ -1465,25 +414,14 @@ const Dashboard = ({
           value={startDate}
           onChangeDate={setStartDate}
           onChangeFinishDate={setFinishDate}
-          closeDate={() => setModalStartDate(!modalStartDate)}
+          closeDate={closeDateModal}
         />
       </MyModal>
-      {/* <MyModal isVisible={modalFinishDate} closeModal={() => setModalFinishDate(!modalFinishDate)}>
-        <View style={{ maxHeight: '100%', paddingVertical: 20, paddingHorizontal: 25 }}>
-          <DatePicker
-            value={finishDate}
-            onChangeDate={setFinishDate}
-            closeDate={() => setModalFinishDate(!modalFinishDate)}
-          />
-        </View>
-      </MyModal> */}
+      
       {/* Info Modal */}
       <MyModalInfo
         isVisible={showModalInfo}
-        closeModal={() => {
-          setShowModalInfo(!showModalInfo);
-          setMessageInfo('');
-        }}
+        closeModal={hideInfoModal}
         message={messageInfo}
       />
     </BaseScreen>
@@ -1715,9 +653,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // ===== LOADING SKELETON STYLES =====
-  loadingSkeleton: {
-    backgroundColor: 'rgba(0,0,0,0.08)',
-    opacity: 0.6,
-  },
 })
