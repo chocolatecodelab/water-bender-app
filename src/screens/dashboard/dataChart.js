@@ -5,40 +5,7 @@
  * into chart-compatible formats for react-native-gifted-charts.
  * 
  * Features:
- * - Multiple chart data processi  // 3. FIXED: Sort by proper sequence -  console.log('🎯 FIXED: Final chart data summary:', {
-    total: combinedData.length,
-    actual: combinedData.filter(d => d.isActual).length,
-    forecast: combinedData.filter(d => d.isForecast).length,
-    lastActualHour: Math.max(...actualData.map(item => item.Jam)),
-    forecastSequence: combinedData.filter(d => d.isForecast).map(d => ({ 
-      hour: d.hour, 
-      date: d.forecastDate,
-      isNextDay: d.isNextDay 
-    }))
-  });al by original order, forecast by sequence
-  combinedData.sort((a, b) => {
-    if (a.isActual && b.isActual) {
-      return a.hour - b.hour; // Sort actual by hour
-    }
-    if (a.isForecast && b.isForecast) {
-      return a.sortOrder - b.sortOrder; // Sort forecast by sequence order
-    }
-    if (a.isActual && b.isForecast) {
-      return -1; // Actual always comes before forecast
-    }
-    if (a.isForecast && b.isActual) {
-      return 1; // Forecast always comes after actual
-    }
-    return 0;
-  });
-
-  console.log('🎯 FIXED: Final chart data summary:', {
-    total: combinedData.length,
-    actual: combinedData.filter(d => d.isActual).length,
-    forecast: combinedData.filter(d => d.isForecast).length,
-    lastActualHour: Math.max(...actualData.map(item => item.Jam)),
-    forecastSequence: combinedData.filter(d => d.isForecast).map(d => d.hour)
-  });ds (Hourly, Period, Monthly)
+ * - Multiple chart data processing methods (Hourly, Period, Monthly)
  * - Real-time forecast data integration without caching
  * - Factory pattern for component creation and memory optimization
  * - Smart data aggregation and sorting algorithms
@@ -143,10 +110,29 @@ export const generateDailyChartWithForecast = (actualData, forecastData) => {
       isActual: true,
       isForecast: false,
       dataPointColor: COLOR_MAIN_SECONDARY,
-      // OPTIMIZED: Direct component creation (no factory pattern)
+      // FIXED: Enhanced label component with proper positioning for hourly labels
       labelComponent: () => (
-        <View style={{ marginLeft: 20, paddingLeft: 5, alignItems: 'center' }}>
-          <Text style={{ color: COLOR_GRAY_2, fontSize: 12 }}>{jam}</Text>
+        <View style={{ 
+          marginLeft: 20, 
+          paddingLeft: 5, 
+          alignItems: 'center',
+          justifyContent: 'flex-start', // Align to top to prevent offset
+          minHeight: 20, // Consistent height
+          paddingTop: 2 // Small top padding for better positioning
+        }}>
+          <Text style={{ 
+            color: COLOR_GRAY_2, 
+            fontSize: 11, // Slightly smaller for better fit
+            fontWeight: '500',
+            textAlign: 'center',
+            lineHeight: 12, // Control line height to prevent offset
+            includeFontPadding: false, // Remove extra font padding
+            textAlignVertical: 'top', // Align text to top
+            marginTop: 0, // No top margin
+            paddingTop: 0 // No top padding on text
+          }}>
+            {jam}
+          </Text>
         </View>
       ),
       // ADDED: Tooltip untuk data actual
@@ -233,14 +219,26 @@ export const generateDailyChartWithForecast = (actualData, forecastData) => {
         dataPointColor: COLOR_PRIMARY,
         forecastDate: dateDisplay,
         isNextDay: isNextDay,
-        // FIXED: Enhanced label component with proper date display for next day
+        // FIXED: Enhanced label component with proper positioning for forecast labels
         labelComponent: () => (
-          <View style={{ marginLeft: 30, alignItems: 'center' }}>
+          <View style={{ 
+            marginLeft: 30, 
+            alignItems: 'center',
+            justifyContent: 'flex-start', // Align to top
+            minHeight: 30, // Slightly taller for forecast with date
+            paddingTop: 2
+          }}>
             <Text style={{ 
               color: COLOR_PRIMARY, 
-              fontSize: 12, 
+              fontSize: 11, // Consistent with actual data
               fontStyle: 'italic',
-              textAlign: 'center'
+              textAlign: 'center',
+              fontWeight: '500',
+              lineHeight: 12, // Control line height
+              includeFontPadding: false, // Remove extra padding
+              textAlignVertical: 'top',
+              marginTop: 0,
+              paddingTop: 0
             }}>
               {jam}
             </Text>
@@ -250,7 +248,9 @@ export const generateDailyChartWithForecast = (actualData, forecastData) => {
                 fontSize: 9, 
                 fontStyle: 'italic',
                 textAlign: 'center',
-                marginTop: 2
+                marginTop: 1, // Smaller gap between hour and date
+                lineHeight: 10, // Control line height for date
+                includeFontPadding: false
               }}>
                {dateDisplay}
               </Text>
@@ -574,7 +574,6 @@ const getDatesInRangeSecondMethod = (data) => {
 
     // Mengurutkan data berdasarkan Tanggal
     const sortedData = combinedData.sort((a, b) => new Date(a.Tanggal) - new Date(b.Tanggal));
-
     return sortedData;
   }
 
@@ -790,6 +789,7 @@ const createDataObject = (date, method) => {
       displayLabel = method === 2 ? jedaFormatDate : formattedDate;
       shouldShow = method === 2 ? !isSameAsPrevious : true;
       dataPoint.label = displayLabel;
+      dataPoint.hour = extractedHour; // Untuk pointer config daily/hourly
     }
 
     // Tambahkan komponen visual
@@ -803,7 +803,7 @@ const createDataObject = (date, method) => {
         }}>
           <Text style={{
             color: COLOR_GRAY_2,
-            fontSize: method === 2 ? 10 : 12,
+            fontSize: method === 2 ? 10 : 11,
             textAlign: 'center',
             lineHeight: method === 2 ? 10 : 14
           }}>
@@ -831,6 +831,9 @@ const createDataObject = (date, method) => {
     dataPoint.dataPointLabelShiftY = -40;
     dataPoint.dataPointLabelShiftX = 0;
     dataPoint.stripHeight = value;
+    
+    // Mark as actual data for filter counting
+    dataPoint.isActual = true;
 
     return dataPoint;
   });

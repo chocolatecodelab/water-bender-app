@@ -408,8 +408,12 @@ export const createPointerConfig = (colors, chartType = 'daily') => ({
           timeDisplay = item.time;
         } else if (item.hour !== null && item.hour !== undefined) {
           timeDisplay = formatHourDisplay(item.hour);
+        } else if (item.label && item.label.match(/^\d{1,2}:\d{2}$/)) {
+          // ADDED: Extract time from label format "HH:MM" or "H:MM"
+          timeDisplay = item.label;
         }
         
+        // For daily/hourly charts, typically no separate date display needed
         if (item.date) {
           dateDisplay = item.date;
         }
