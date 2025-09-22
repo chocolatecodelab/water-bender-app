@@ -65,6 +65,20 @@ Water Bender App adalah aplikasi mobile berbasis React Native untuk monitoring k
 - Pastikan emulator/simulator sudah berjalan sebelum menjalankan aplikasi.
 - Untuk build iOS, jalankan `pod install` di folder `ios/` setelah install dependencies.
 
+
+## Screenshot Aplikasi
+
+Berikut adalah beberapa tampilan dari Water Bender App:
+
+<p align="center">
+   <img src="src/assets/screenshots/dashboard%20(1).jpg" alt="Dashboard 1" width="250" />
+   <img src="src/assets/screenshots/dashboard%20(2).jpg" alt="Dashboard 2" width="250" />
+   <img src="src/assets/screenshots/dashboard%20(3).jpg" alt="Dashboard 3" width="250" />
+   <img src="src/assets/screenshots/dashboard%20(4).jpg" alt="Dashboard 4" width="250" />
+   <img src="src/assets/screenshots/dashboard%20(5).jpg" alt="Dashboard 5" width="250" />
+   <img src="src/assets/screenshots/dashboard%20(6).jpg" alt="Dashboard 6" width="250" />
+</p>
+
 ## Troubleshooting
 
 Jika mengalami kendala, silakan cek dokumentasi [React Native Troubleshooting](https://reactnative.dev/docs/troubleshooting) atau hubungi pengembang.
