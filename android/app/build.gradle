@@ -130,3 +130,9 @@ afterEvaluate {
     tasks.findByName("generateReleaseLintVitalReportModel")?.mustRunAfter("copyReactNativeVectorIconFonts")
 }
 
+tasks.whenTaskAdded { task ->
+    if (task.name == 'lintVitalAnalyzeRelease') {
+        task.dependsOn 'copyReactNativeVectorIconFonts'
+    }
+}
+
