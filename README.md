@@ -1,79 +1,74 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
-# Getting Started
+# Water Bender App
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+Water Bender App adalah aplikasi mobile berbasis React Native untuk monitoring kedalaman air secara real-time dan historis. Aplikasi ini digunakan untuk menampilkan data sensor air, grafik kedalaman air, serta menyediakan fitur login dan registrasi pengguna. Dikembangkan untuk kebutuhan monitoring di lingkungan pertambangan atau industri yang membutuhkan pemantauan level air.
 
-## Step 1: Start the Metro Server
+## Fitur Utama
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+- **Dashboard**: Menampilkan grafik kedalaman air harian, bulanan, dan periode tertentu.
+- **Login & Registrasi**: Autentikasi pengguna dengan penyimpanan data menggunakan Redux dan Redux Persist.
+- **Visualisasi Data**: Grafik interaktif menggunakan `react-native-gifted-charts`.
+- **Multi Platform**: Mendukung Android dan iOS.
 
-To start Metro, run the following command from the _root_ of your React Native project:
+## Struktur Project
 
-```bash
-# using npm
-npm start
+- `src/screens/`: Berisi halaman utama seperti Dashboard, Login, Register, dan Splash.
+- `src/components/`: Komponen UI custom seperti Button, Modal, Header, dsb.
+- `src/redux/`: State management menggunakan Redux Toolkit dan Persist.
+- `src/tools/`: Konstanta, helper, dan utilitas aplikasi.
+- `src/assets/`: Asset gambar dan font.
 
-# OR using Yarn
-yarn start
-```
+## Instalasi
 
-## Step 2: Start your Application
+### Prasyarat
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+- Node.js >= 18
+- npm atau yarn
+- Android Studio (untuk build Android) / Xcode (untuk build iOS)
+- Sudah melakukan [React Native Environment Setup](https://reactnative.dev/docs/environment-setup)
 
-### For Android
+### Langkah Instalasi
 
-```bash
-# using npm
-npm run android
+1. **Clone repository**
+   ```bash
+   git clone <repo-url>
+   cd water_bender_app
+   ```
+2. **Install dependencies**
+   ```bash
+   npm install
+   # atau
+   yarn install
+   ```
+3. **Jalankan Metro Bundler**
+   ```bash
+   npm start
+   # atau
+   yarn start
+   ```
+4. **Build dan jalankan aplikasi**
+   - Untuk Android:
+     ```bash
+     npm run android
+     # atau
+     yarn android
+     ```
+   - Untuk iOS:
+     ```bash
+     npm run ios
+     # atau
+     yarn ios
+     ```
 
-# OR using Yarn
-yarn android
-```
+## Konfigurasi Tambahan
 
-### For iOS
+- Pastikan emulator/simulator sudah berjalan sebelum menjalankan aplikasi.
+- Untuk build iOS, jalankan `pod install` di folder `ios/` setelah install dependencies.
 
-```bash
-# using npm
-npm run ios
+## Troubleshooting
 
-# OR using Yarn
-yarn ios
-```
+Jika mengalami kendala, silakan cek dokumentasi [React Native Troubleshooting](https://reactnative.dev/docs/troubleshooting) atau hubungi pengembang.
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+## Lisensi
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
-
-## Step 3: Modifying your App
-
-Now that you have successfully run the app, let's modify it.
-
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
-
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Proyek ini dikembangkan oleh PT. Kalimantan Prima Persada untuk kebutuhan internal monitoring.
